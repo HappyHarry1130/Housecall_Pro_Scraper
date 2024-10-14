@@ -1,0 +1,8 @@
+selenium
+webdriver_manager
+openai==0.28
+bs4
+gspread_dataframe
+gspread
+oauth2client
+google-api-python-client
