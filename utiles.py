@@ -33,6 +33,15 @@ def write_to_google_sheet(data, spreadsheet_id, sheet_name):
         spreadsheet = client.open_by_key(spreadsheet_id)
         try:
             sheet = spreadsheet.worksheet(sheet_name)
+            # Check if today is Monday and clear the sheet if it exists
+            if datetime.now().weekday() == 0:  # 0 is Monday
+                # sheet.clear()
+                None
+        except gspread.exceptions.WorksheetNotFound:
+            # Create the sheet if it doesn't exist
+            sheet = spreadsheet.add_worksheet(title=sheet_name, rows="1000", cols="20")
+        try:
+            sheet = spreadsheet.worksheet(sheet_name)
         except gspread.exceptions.WorksheetNotFound:
             sheet = spreadsheet.add_worksheet(title=sheet_name, rows="1000", cols="20")
 
@@ -46,10 +55,9 @@ def write_to_google_sheet(data, spreadsheet_id, sheet_name):
         else:
             level_value = 200
         current_headers = sheet.row_values(1)
-        headers = ["Date", "Customer", "Link",  "WARRANTY COMPANY", "Claim Approved or Denied",  "OMW",  "ClockIn", "ClockOut", "Drive Time", "Time Spent on Job", "What was done", "Tech Called Office (Yes or No)", "What Was Call About?","Misdiagnosis (Yes or No)","Job Pics", "Job Notes","Tech Submitted Estimate For Upsell Opportunity (Yes or No)", "What Tech Should Have Submitted For Upsell", "Maintenance Plan Offered?", "Maintenance Plan Signup %", "DID THE TECH COLLECT PAYMENT",  "Seg 1 Subtotal", "Seg 2 Subtotal" , "Discount", "Final Invoice", "Our Cost On Parts", "Tech Burden to run call", "Day rate per job Cost",  "Commision Paid To Tech","Daily Revenue  (+/-):", "Conclusions", "Techs Reasoning"]
+        headers = ["Date", "Customer", "Link",  "Claim Approved or Denied",  "OMW",  "ClockIn", "ClockOut", "Drive Time", "Time Spent on Job", "What was done", "Tech Called Office (Yes or No)", "What Was Call About?","Misdiagnosis (Yes or No)","Job Pics", "Job Notes","Tech Submitted Estimate For Upsell Opportunity (Yes or No)", "Missed opportunities", "Maintenance Plan Offered?",  "Seg 1 Subtotal", "Seg 2 Subtotal" , "Discount", "Final Invoice", "Our Cost On Parts", "Tech Burden to run call", "Day rate per job Cost",  "Commision Paid To Tech","Daily Revenue  (+/-):", "Conclusions", "Techs Reasoning"]
         if current_headers:
             sheet.update('A1:AG1', [headers])
-            # None
         else:
             sheet.update('A1:AG1', [headers])
         row_height_request = {
@@ -195,13 +203,11 @@ def write_to_google_sheet(data, spreadsheet_id, sheet_name):
 
 
 
-        driven_time_colnum = 9
-        time_spent_colnum= 10
-        job_pics_colume = 15
-        job_note_colume = 16
-        pay_colume = 21
-        cost_of_tech_colume = 27
-        daily_revenue_colume = 29
+        driven_time_colnum = 8
+        time_spent_colnum= 9
+        job_pics_colume = 14
+        job_note_colume = 15
+        # pay_colume = 21
 
         driven_time = data[driven_time_colnum-1]
 
@@ -214,8 +220,8 @@ def write_to_google_sheet(data, spreadsheet_id, sheet_name):
         job_notes_length = data[job_note_colume-1]  # I column is the 9th column, 0-indexed as 8
         data[job_note_colume-1] = "Yes" if job_notes_length > 0 else "No"
         
-        pay =data[pay_colume-1]
-        data [pay_colume-1] = "Yes" if pay == 10 else "No"
+        # pay =data[pay_colume-1]
+        # data [pay_colume-1] = "Yes" if pay == 10 else "No"
 
 
         existing_rows = sheet.get_all_values()
@@ -249,36 +255,41 @@ def write_to_google_sheet(data, spreadsheet_id, sheet_name):
         print (f'count of calls : {count_of_calls}')
         one_cost_of_tech = level_value / count_of_calls
 
-        if data[5]:
-            omw_time = parse_time(data[5])
+        if data[4]:
+            omw_time = parse_time(data[4])
         else: omw_time = 0
-        if data[7]:
-            clockout_time = parse_time(data[7])
+        if data[6]:
+            clockout_time = parse_time(data[6])
         else: clockout_time = omw_time
         time_range = clockout_time - omw_time
         print(f'time_range: {time_range}')
         if time_range ==0: tech_Burden_to_run_call = 0
         else :tech_Burden_to_run_call = 0.8 * time_range.total_seconds()/60
         print(f'tech_Burden_to_run_call: {tech_Burden_to_run_call}')
-        data[26] = tech_Burden_to_run_call
+        data[23] = tech_Burden_to_run_call
 
         if row_to_update:
             # Exclude "Claim Submitted(Yes or No)" column (index 5) from the update
             existing_row = sheet.row_values(row_to_update)
-            data[4] = existing_row[4]
+            data[3] = existing_row[3]
+            data[9] = existing_row[9]
             data[10] = existing_row[10]
             data[11] = existing_row[11]
             data[12] = existing_row[12]
-            data[13] = existing_row[13]
+            data[15] = existing_row[15]
             data[16] = existing_row[16]
             data[17] = existing_row[17]
             data[18] = existing_row[18]
             data[19] = existing_row[19]
+            data[20] = existing_row[20]
+            data[21]= existing_row[21]
+            data[22] = existing_row[22]
+            data[24] = existing_row[24]
+            data[25] = existing_row[25]
+            data[26] = existing_row[26]
             data[27] = existing_row[27]
             data[28] = existing_row[28]
-            data[29] = existing_row[29]
-            data[30] = existing_row[30]
-            data[31] = existing_row[31]
+            
             # data_to_update = data[:4] + data[6:10] + data[15:16] + data[21:27]   # Ensure data[29] is a list
             cell_range = f'A{row_to_update}:AG{row_to_update}'
             sheet.update(cell_range, [data])
@@ -412,57 +423,57 @@ def write_to_google_sheet(data, spreadsheet_id, sheet_name):
         sheet.format(cell.address, cell_format)
         
 
-        if pay == 1:
-            cell = sheet.cell(next_row, pay_colume)  
-            cell_format = {
-                "backgroundColor": {
-                    "red": 1,
-                    "green": 0,
-                    "blue": 0
-                }
-            }
-            sheet.format(cell.address, cell_format)
-        elif pay ==10:
-            cell = sheet.cell(next_row, pay_colume)  
-            cell_format = {
-                "backgroundColor": {
-                    "red": 0,
-                    "green": 1,
-                    "blue": 0
-                }
-            }
-            sheet.format(cell.address, cell_format)
-        else:
-            cell = sheet.cell(next_row, pay_colume)  
-            cell_format = {
-                "backgroundColor": {
-                    "red": 1,
-                    "green": 1,
-                    "blue": 0
-                }
-            }
-            sheet.format(cell.address, cell_format)
+        # if pay == 1:
+        #     cell = sheet.cell(next_row, pay_colume)  
+        #     cell_format = {
+        #         "backgroundColor": {
+        #             "red": 1,
+        #             "green": 0,
+        #             "blue": 0
+        #         }
+        #     }
+        #     sheet.format(cell.address, cell_format)
+        # elif pay ==10:
+        #     cell = sheet.cell(next_row, pay_colume)  
+        #     cell_format = {
+        #         "backgroundColor": {
+        #             "red": 0,
+        #             "green": 1,
+        #             "blue": 0
+        #         }
+        #     }
+        #     sheet.format(cell.address, cell_format)
+        # else:
+        #     cell = sheet.cell(next_row, pay_colume)  
+        #     cell_format = {
+        #         "backgroundColor": {
+        #             "red": 1,
+        #             "green": 1,
+        #             "blue": 0
+        #         }
+        #     }
+        #     sheet.format(cell.address, cell_format)
         
-        if data[29].strip().isdigit() and int(data[29]) > 0:
-            cell = sheet.cell(next_row, 30)  
-            cell_format = {
-                "backgroundColor": {
-                    "red": 0,
-                    "green": 1,
-                    "blue": 0
-                }
-            }
-            sheet.format(cell.address, cell_format)
-        else:
-            cell = sheet.cell(next_row, 30) 
-            cell_format = {
-                "backgroundColor": {
-                    "red": 1,
-                    "green": 0,
-                    "blue": 0
-                }
-            }
-            sheet.format(cell.address, cell_format)
+        # if data[29].strip().isdigit() and int(data[29]) > 0:
+        #     cell = sheet.cell(next_row, 30)  
+        #     cell_format = {
+        #         "backgroundColor": {
+        #             "red": 0,
+        #             "green": 1,
+        #             "blue": 0
+        #         }
+        #     }
+        #     sheet.format(cell.address, cell_format)
+        # else:
+        #     cell = sheet.cell(next_row, 30) 
+        #     cell_format = {
+        #         "backgroundColor": {
+        #             "red": 1,
+        #             "green": 0,
+        #             "blue": 0
+        #         }
+        #     }
+        #     sheet.format(cell.address, cell_format)
         # Set up data validation for "Job Pics" and "Job Notes" columns in the newly added row
         service = build('sheets', 'v4', credentials=creds)
         body = {
@@ -665,6 +676,9 @@ def write_to_google_sheet_2(data, spreadsheet_id, sheet_name="Data"):
     # Open the spreadsheet
     spreadsheet = client.open_by_key(spreadsheet_id)
 
+    if datetime.now().weekday() == 0:
+        sheet = spreadsheet.worksheet(sheet_name)
+        sheet.clear()
     # Check if the sheet already exists
     try:
         sheet = spreadsheet.worksheet(sheet_name)
@@ -694,6 +708,10 @@ def write_to_google_sheet_2(data, spreadsheet_id, sheet_name="Data"):
     if row_to_update:
         # Update the existing row
         cell_range = f'A{row_to_update}:F{row_to_update}'
+        existing_row = sheet.row_values(row_to_update)
+        data[3] = existing_row[3]
+        data[4] = existing_row[4]
+        data[5] = existing_row[5]
         sheet.update(cell_range, [data])
         next_row = row_to_update
     else:
@@ -704,10 +722,11 @@ def write_to_google_sheet_2(data, spreadsheet_id, sheet_name="Data"):
     # Formatting for the header row
     header_range = f"A1:F1"  # Adjust based on your headers
     sheet.format(header_range, {
-        "backgroundColor": {"red": 1.0, "green": 0.8, "blue": 0.8},
+        "backgroundColor": {"red": 0, "green": 0.8, "blue": 0.8},
         "textFormat": {"bold": True},
         "horizontalAlignment": "CENTER"
     })
+    header_range = f"A1:I1"  # Adjust based on your headers
 
     # Set column widths and row heights using Google Sheets API
     service = build('sheets', 'v4', credentials=creds)
@@ -847,6 +866,29 @@ def write_to_google_sheet_2(data, spreadsheet_id, sheet_name="Data"):
 
     # Execute the request to set column widths, row heights, and sort the data
     service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=body).execute()
+    alignment_request = {
+        "requests": [
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet.id,
+                        "startRowIndex": 0,
+                        "endRowIndex": next_row,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 35
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "horizontalAlignment": "CENTER",
+                            "verticalAlignment": "MIDDLE"
+                        }
+                    },
+                    "fields": "userEnteredFormat(horizontalAlignment,verticalAlignment)"
+                }
+            }
+        ]
+    }
+    service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=alignment_request).execute()
 
 
 def write_to_google_sheet_3(data, spreadsheet_id, sheet_name="Data"):

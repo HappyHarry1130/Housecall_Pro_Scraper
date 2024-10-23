@@ -53,17 +53,17 @@ def extract_names_and_links(driver):
 
     html_doc = driver.page_source
     time.sleep(random.uniform(2, 4))
-    soup = BeautifulSoup(html_doc, 'html.parser')
-    
-    names = [th.find(class_='fc-resource-custom-name').text for th in soup.find_all('th', role='columnheader') if th.find(class_='fc-resource-custom-name')]
-    print(names)
-    if not names:
-        print("No names found. Retrying...")
-        extract_names_and_links(driver)
-    else:
-        all_names.extend(names)
+    soup = BeautifulSoup(html_doc, 'html.parser')   
+
 
     links = [a.get('href') for a in soup.find_all('a', class_='fc-timegrid-event')]
+    if len(links) == 0:
+        print("No names found. Retrying...")
+        extract_names_and_links(driver)
+        return
+    else:
+        all_links.extend(links)
+    print(f'links:{links}')
     print(links)
     all_links.extend(links)
     try:
@@ -83,7 +83,10 @@ def run(driver):
         time.sleep(random.uniform(5,10))
         logging.info("Navigating to the archived reviews page")
         driver.get("https://pro.housecallpro.com/pro/calendar_new")
-        for _ in range(7): 
+        current_day_of_week = datetime.now().weekday()
+        iterations = current_day_of_week + 1
+
+        for _ in range(iterations): 
             extract_names_and_links(driver)
         print("All names:", all_names)
         print("All links:", all_links)
@@ -368,7 +371,7 @@ def run(driver):
                 total_unit_costs = total_cost1+ total_cost2
                 discount = discount1 + discount2           
             
-                data = [formatted_date,customer_name,full_url , warranty_company, ' ' , omw,  clickin, clickout, time_to_clickin, time_to_clickout, ' ', ' ', ' ', ' ',  job_pics, job_note_word_count, ' ', ' ', ' ', ' ', pay, subtotal1, subtotal2, discount, total_price, total_unit_costs, ' ', ' ', ' ', ' ', ' ' ,' ']
+                data = [formatted_date,customer_name,full_url , ' ' , omw,  clickin, clickout, time_to_clickin, time_to_clickout, ' ', ' ', ' ', ' ',  job_pics, job_note_word_count, ' ', ' ', ' ', ' ',  ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' ,' ']
                 print(data)
                 write_to_google_sheet(data, "1Wah4JVOkaiGRvsYO0QOpcTkrg9i59NrGr5LA5YD8CrU", name)
              
