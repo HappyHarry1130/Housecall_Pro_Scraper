@@ -1,4 +1,3 @@
-
 import logging
 import time
 import json
@@ -24,12 +23,11 @@ from datetime import datetime
 import json
 from oauth2client.service_account import ServiceAccountCredentials
 from googleapiclient.discovery import build
-from utiles import Warranty_Retail, write_to_google_sheet, get_informations
+from utiles import get_informations
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.options import Options
 import sys
-import asyncio
-from utiles import write_to_google_sheet_3
+
 
 
 
@@ -50,182 +48,146 @@ def human_typing(element, text, delay=0.2):
 all_names = []
 all_links = []
 
-def click_and_extract_links(driver):
+def extract_names_and_links(driver):
+
+    html_doc = driver.page_source
+    time.sleep(random.uniform(1, 2))
+    soup = BeautifulSoup(html_doc, 'html.parser')
+    
+    # names = [th.find(class_='fc-resource-custom-name').text for th in soup.find_all('th', role='columnheader') if th.find(class_='fc-resource-custom-name')]
+    # print(f'names:{names}')
+    # time.sleep(random.uniform(1, 2))
+    # print(len(names))
+    # if len(names) == 0:
+    #     print("No names found. Retrying...")
+    #     extract_names_and_links(driver)
+    # else:
+    #     all_names.extend(names)
+
+    links = [a.get('href') for a in soup.find_all('a', class_='fc-timegrid-event')]
+    if len(links) == 0:
+        print("No names found. Retrying...")
+        extract_names_and_links(driver)
+        return
+    else:
+        all_links.extend(links)
+    print(f'links:{links}')
+    all_links.extend(links)
     try:
-        rows = WebDriverWait(driver, 50).until(
-            EC.presence_of_all_elements_located((By.XPATH, "//table/tbody/tr/td/a"))
+        back_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="calendar-date__back-button"]'))
         )
-        print(f"Number of rows found: {len(rows)}")
-        
-        links = [] 
+        back_button.click()
+        print("Button clicked successfully")
+    except TimeoutException:
+        print("Timed out waiting for the button to be clickable")
+    
+    time.sleep(random.uniform(2, 4)) 
 
-        for row in rows:
-            try:
-                anchor = row
-
-                link = anchor.get_attribute('href')
-                print(f"Link found: {link}")
-                links.append(link)  # Store the link
-                
-                 
-                time.sleep(random.uniform(1, 2))  # Optional: Add a delay between clicks
-            except Exception as e:
-                print(f"Error processing row: {e}")
-
-        # Extract data from the collected links
-        extract_data_from_links(driver, links)
-
-    except NoSuchElementException:
-        print("No elements found with the specified XPath")
-
-def extract_data_from_links(driver, links):
-    for link in links:
-        try:
-
-            driver.get(link)
-            print(f"Navigating to {link}")
-            try:
-                # Locate the span element with the text "Jobs"
-                jobs_tab = WebDriverWait(driver, 50).until(
-                    EC.element_to_be_clickable((By.XPATH, "//span[text()='Jobs']"))
-                )
-                
-                # Click the "Jobs" tab
-                jobs_tab.click()
-                print("Clicked on the 'Jobs' tab successfully")
-
-            except TimeoutException:
-                print("The 'Jobs' tab was not found or not clickable within the timeout period")
-            except Exception as e:
-                print(f"An error occurred while trying to click the 'Jobs' tab: {e}")
-            time.sleep(random.uniform(1, 2))  
-
-        except Exception as e:
-            print(f"Error processing link {link}: {e}")
-        time.sleep(random.uniform(1, 2))  
-        click_to_get_data(driver)
-
-def click_to_get_data(driver):
-    try:
-        rows = WebDriverWait(driver, 50).until(
-            EC.presence_of_all_elements_located((By.XPATH, "//table/tbody/tr"))
-        )
-        print(f"Number of rows found: {len(rows)}")
-
-        for index in range(len(rows)):
-            try:
-                # Re-fetch the rows to avoid stale element reference
-                rows = WebDriverWait(driver, 50).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//table/tbody/tr"))
-                )
-                
-                # Click the current row
-                rows[index].click()
-                print(f"Clicked on row {index + 1}")
-                
-                # Extract data from the current page
-                extract_data_from_current_page(driver)
-                
-                # Optional: Add a delay between operations
-                time.sleep(random.uniform(1, 2))
-                
-                driver.back()  # Go back to the previous page
-                WebDriverWait(driver, 50).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//table/tbody/tr"))
-                )  # Wait for the elements to be present again
-
-            except Exception as e:
-                print(f"Error processing row {index + 1}: {e}")
-
-    except NoSuchElementException:
-        print("No elements found with the specified XPath")
-
-def extract_data_from_current_page(driver):
-    try:
-        WebDriverWait(driver, 50).until(EC.presence_of_element_located((By.XPATH, '//div/div/div/div/div/p[@data-hcp-mask-type="unmasked"]')))
-
-        tree = html.fromstring(driver.page_source)
-        customer_name_elements = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//div/div/div/div/div/div/div/div/div/div/div/div/div/div/p[@data-hcp-mask-type="unmasked"]')))
-        english_letter_elements = [element for element in customer_name_elements if re.match(r'^[A-Za-z]', element.text)]
-        info = []
-        for row in customer_name_elements:
-            info.append(row.text)
-
-        for data in english_letter_elements:
-            print(data)
-        if customer_name_elements:
-            if english_letter_elements[0].text == 'Street view image not available.':
-
-                customer_name = english_letter_elements[1].text
-                print(f"Customer Name text: {english_letter_elements[1].text}")
-            else:
-                customer_name = english_letter_elements[0].text
-                print(f"Customer text: {english_letter_elements[0].text}")
-        else:
-            print("Element not found")
-        
-        data_element = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//div/div/div/div/div/div/div/div/div/div/div/div/div[@data-hcp-mask-type="unmasked"]')))
-        if data_element:
-            date_elements = [element for element in data_element if re.match(r'\w{3}, \w{3} \d{1,2} \'\d{2}', element.text)]
-            print(len(date_elements))
-            if len(date_elements)>1:
-                date = date_elements[1].text
-                print(f"Date: {date}")
-            else:
-                date = date_elements[0].text
-                print(f"Date: {date}")
-        else:
-            print("No data elements found")
-
-        job_customer_tags_elements = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//textarea[@data-testid="name-tag-chip"]//span')))
-        for tag in job_customer_tags_elements:
-            print(tag.text)
-        date_obj = datetime.strptime(date, "%a, %b %d '%y")
-        formatted_date = date_obj.strftime("%Y-%m-%d")
-        getinfo = get_informations(info)
-        print(getinfo)
-        what_have_done_text = ''
-        what_have_done = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//textarea[@data-testid="name-input"]')))
-        for row in what_have_done:
-            print(row.text)
-        if len(what_have_done)>1:
-            what_have_done_text = what_have_done[0].text
-            material = what_have_done[1].text
-        elif len(what_have_done)>0:
-            what_have_done_text = what_have_done[0].text
-            material = ''
-
-
-        parsed_result = json.loads(getinfo)
-
-        customer_name = parsed_result.get("Name")
-        adress = parsed_result.get("Address")
-        email = parsed_result.get('Email')
-        phoneNumber = parsed_result.get('Phone Number')
-        current_url = driver.current_url
-        print(f"Current URL: {current_url}")
-        service = ''
-        data = [formatted_date, customer_name, current_url ,  adress, email, phoneNumber, what_have_done_text, material, service]
-        print(data)
-        # write_to_google_sheet_3(data, '1oK2JkSWbdya1zJdqLzEURQyH7miQyyEHlhWlO5lpvJU', "EmailMarketing")
- 
-
-
-    except Exception as e:
-        print('Error:', e)
-
-
-def run(driver, page_range):
+def run(driver):
     try:
         logging.info("Sign-in successful")
-        time.sleep(random.uniform(5,10))
+        time.sleep(random.uniform(3,5))
         logging.info("Navigating to the archived reviews page")
-        for page in page_range:
-            driver.get(f"https://pro.housecallpro.com/pro/customers/list?page_size=50&page={page}")
-            click_and_extract_links(driver)
-        print("All names:", all_names)
+        driver.get("https://pro.housecallpro.com/pro/calendar_new")
+        current_day_of_week = datetime.now().weekday()
+        iterations = current_day_of_week + 1
+
+        for _ in range(iterations): 
+            extract_names_and_links(driver)
+            time.sleep(random.uniform(2,3))
+        
         print("All links:", all_links)
         total_links = len(all_links)
+        for index, link in enumerate(all_links, start=1):
+            percent = (index / total_links) * 100
+            bar_length = 50 
+            filled_length = int(bar_length * index // total_links)
+            bar = '>' * filled_length + '-' * (bar_length - filled_length)
+
+            # Print progress
+            sys.stdout.write(f"\rProcessing link {index}/{total_links}: [{bar}] {percent:.2f}%")
+            sys.stdout.flush()
+            full_url = "https://pro.housecallpro.com" + link  
+            driver.get(full_url)
+            print(full_url)
+            try:
+                WebDriverWait(driver, 50).until(EC.presence_of_element_located((By.XPATH, '//div/div/div/div/div/p[@data-hcp-mask-type="unmasked"]')))
+
+                tree = html.fromstring(driver.page_source)
+                customer_name_elements = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//div/div/div/div/div/div/div/div/div/div/div/div/div/div/p[@data-hcp-mask-type="unmasked"]')))
+                english_letter_elements = [element for element in customer_name_elements if re.match(r'^[A-Za-z]', element.text)]
+                info = []
+                for row in customer_name_elements:
+                    info.append(row.text)
+
+                for data in english_letter_elements:
+                    print(data)
+                if customer_name_elements:
+                    if english_letter_elements[0].text == 'Street view image not available.':
+
+                        customer_name = english_letter_elements[1].text
+                        print(f"Customer Name text: {english_letter_elements[1].text}")
+                    else:
+                        customer_name = english_letter_elements[0].text
+                        print(f"Customer text: {english_letter_elements[0].text}")
+                else:
+                    print("Element not found")
+                
+                data_element = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//div/div/div/div/div/div/div/div/div/div/div/div/div[@data-hcp-mask-type="unmasked"]')))
+                if data_element:
+                    date_elements = [element for element in data_element if re.match(r'\w{3}, \w{3} \d{1,2} \'\d{2}', element.text)]
+                    print(len(date_elements))
+                    if len(date_elements)>1:
+                        date = date_elements[1].text
+                        print(f"Date: {date}")
+                    else:
+                        date = date_elements[0].text
+                        print(f"Date: {date}")
+                else:
+                    print("No data elements found")
+
+                job_customer_tags_elements = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//textarea[@data-testid="name-tag-chip"]//span')))
+                for tag in job_customer_tags_elements:
+                    print(tag.text)
+                date_obj = datetime.strptime(date, "%a, %b %d '%y")
+                formatted_date = date_obj.strftime("%Y-%m-%d")
+                getinfo = get_informations(info)
+                print(getinfo)
+                what_have_done_text = ''
+                what_have_done = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//textarea[@data-testid="name-input"]')))
+                for row in what_have_done:
+                    print(row.text)
+                if len(what_have_done)>1:
+                    what_have_done_text = what_have_done[0].text
+                    material = what_have_done[1].text
+                elif len(what_have_done)>0:
+                    what_have_done_text = what_have_done[0].text
+                    material = ''
+
+
+                parsed_result = json.loads(getinfo)
+
+                customer_name = parsed_result.get("Name")
+                adress = parsed_result.get("Address")
+                email = parsed_result.get('Email')
+                phoneNumber = parsed_result.get('Phone Number')
+                current_url = driver.current_url
+                print(f"Current URL: {current_url}")
+                service = ''
+                data = [formatted_date, customer_name, current_url ,  adress, email, phoneNumber, what_have_done_text, material, service]
+                print(data)
+                # write_to_google_sheet_3(data, '1oK2JkSWbdya1zJdqLzEURQyH7miQyyEHlhWlO5lpvJU', "EmailMarketing")
+        
+
+
+            except Exception as e:
+                print('Error:', e)
+             
+            except Exception as e:
+                print('Error:', e)
+            title = driver.title
+            print(f"Title of {full_url}: {title}")    
 
 
         
@@ -252,14 +214,14 @@ def run_automtion():
     time.sleep(3)
     logging.info("Locating the email and password fields and sign-in button")
     try:
-        email_field = WebDriverWait(driver, 50).until(
+        email_field = WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.ID, "email"))
         )
     except TimeoutException:
         print("Email field not found within the given time.")
 
     try:
-        password_field = WebDriverWait(driver, 50).until(
+        password_field = WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.ID, "password"))
         )
     except TimeoutException:
@@ -276,11 +238,7 @@ def run_automtion():
     logging.info("Waiting for the page to load")
     driver.implicitly_wait(5)
     time.sleep(10)
-
-    # start_page = int(input("Enter the start page number: "))
-    # end_page = int(input("Enter the end page number: "))
-
-    run(driver, range(6, 10))
+    run(driver)
 
 
 while True:
