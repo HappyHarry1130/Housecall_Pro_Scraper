@@ -23,7 +23,7 @@ from datetime import datetime
 import json
 from oauth2client.service_account import ServiceAccountCredentials
 from googleapiclient.discovery import build
-from utiles import get_informations
+from utiles import get_informations, write_to_google_sheet_for_recall, write_to_google_sheet_for_warrancy
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.options import Options
 import sys
@@ -133,6 +133,18 @@ def run(driver):
                         print(f"Customer text: {english_letter_elements[0].text}")
                 else:
                     print("Element not found")
+
+                try:
+                    name_elements = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//div/div/div/div/div/div/div/div/div/div/div/div/div/div[@data-testid="assignedEmployee"]/span')))
+                    for ele in name_elements:
+                        if ele.text: 
+                            name = ele.text  
+                            print(f"First character of element text: {name}")
+                            break
+                        else:
+                            print("Element text is empty")
+                except TimeoutException:
+                    name = ''
                 
                 data_element = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//div/div/div/div/div/div/div/div/div/div/div/div/div[@data-hcp-mask-type="unmasked"]')))
                 if data_element:
@@ -146,24 +158,32 @@ def run(driver):
                         print(f"Date: {date}")
                 else:
                     print("No data elements found")
-
-                job_customer_tags_elements = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//textarea[@data-testid="name-tag-chip"]//span')))
+                matching_tags = [
+                    "Choice Home Warranty Recall",
+                    "Old Republic Recall",
+                    "Platinum Home Warranty Recall",
+                    "2-10 Home Warranty Recall",
+                    "Retail Diagnostic Recall"
+                ]
+                waranty_home_text = 'Super Warranty Customer'
+                saved_tags = []
+                warranty = ''
+                job_customer_tags_elements = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//div[@data-testid="tag-chip"]/span')))
                 for tag in job_customer_tags_elements:
-                    print(tag.text)
+                    tag_text = tag.text
+                    print(tag_text)
+                    if tag_text in matching_tags:
+                        saved_tags.append(tag_text)
+                    if waranty_home_text == tag_text:
+                        warranty = tag_text
+                        break
+                    else: warranty = ''
+                print("Saved Tags:", saved_tags)
+                print("Warranty:", warranty)
                 date_obj = datetime.strptime(date, "%a, %b %d '%y")
                 formatted_date = date_obj.strftime("%Y-%m-%d")
-                getinfo = get_informations(info)
-                print(getinfo)
-                what_have_done_text = ''
-                what_have_done = WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.XPATH, '//textarea[@data-testid="name-input"]')))
-                for row in what_have_done:
-                    print(row.text)
-                if len(what_have_done)>1:
-                    what_have_done_text = what_have_done[0].text
-                    material = what_have_done[1].text
-                elif len(what_have_done)>0:
-                    what_have_done_text = what_have_done[0].text
-                    material = ''
+                getinfo = get_informations(info)             
+
 
 
                 parsed_result = json.loads(getinfo)
@@ -174,10 +194,15 @@ def run(driver):
                 phoneNumber = parsed_result.get('Phone Number')
                 current_url = driver.current_url
                 print(f"Current URL: {current_url}")
-                service = ''
-                data = [formatted_date, customer_name, current_url ,  adress, email, phoneNumber, what_have_done_text, material, service]
-                print(data)
-                # write_to_google_sheet_3(data, '1oK2JkSWbdya1zJdqLzEURQyH7miQyyEHlhWlO5lpvJU', "EmailMarketing")
+
+                if len(saved_tags)>0:
+                    data_for_recall = [formatted_date, customer_name, current_url ,  saved_tags[0]]
+                    write_to_google_sheet_for_recall(data_for_recall, '1JEEmfxSw53U8g5fg8zGQPjorqYLO2X3HtebWNdjMSP4', name)
+                elif warranty:
+                    data_for_warrancy = [formatted_date, customer_name, current_url ,  adress, email, phoneNumber]
+                    write_to_google_sheet_for_warrancy(data_for_warrancy, '1bHEiITlO9M3nTvCjUfT3TnK-a_BJ-bCV4wg-c4yNRR4', name)
+
+
         
 
 
